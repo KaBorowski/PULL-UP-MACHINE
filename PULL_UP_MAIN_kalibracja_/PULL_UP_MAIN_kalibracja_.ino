@@ -9,11 +9,14 @@ Genie genie;
 #define enable 12
 #define on  7
 
-HX711 scale(DOUT, CLK);
+HX711 scale;
 
 const long interval = 15;
 unsigned long previousMillis = 0;
+unsigned long previousMillisCali = 0; 
 unsigned long currentMillis;
+unsigned long currentMillisCali;
+
 int fadeValue = 0;
 bool fadeUp = 1;
 
@@ -51,13 +54,15 @@ float error = 5.0;
 int inc = 0;
 
 //PID
-float Kr = 1.0;
+float Kr = 50.0;
 float Ti = 999999.9;
-float Td 0.0;
+float Td = 0.0;
+float Tp = 0.001;
+const long intervalCali = 100; 
 
-float r0 = Kr*(1+Tp/(2*Ti)+Td/Tp);
-float r1 = Kr*(Tp/(2*Ti)-2*Td/Tp-1);
-float r2 = Kr*Td/Tp;
+float r0;
+float r1;
+float r2;
 
 void setup()
 {
@@ -77,9 +82,14 @@ void setup()
   delay (3500); //let the display start up after the reset (This is important)
 
   calibration_factor = EEPROM.read(calibrationMemoryAddress);
+  scale.begin(DOUT, CLK);
   scale.set_scale(calibration_factor); //Adjust to this calibration factor
   scale.tare();
   genie.WriteStr(0, "PullUp Machine V.08 beta by Bad Caps");
+
+  r0 = Kr*(1+Tp/(2*Ti)+Td/Tp);
+  r1 = Kr*(Tp/(2*Ti)-2*Td/Tp-1);
+  r2 = Kr*Td/Tp;
 }
 
 
@@ -94,7 +104,6 @@ void loop()
   
   genie.DoEvents(); // This calls the library each loop to process the queued responses from the display
 
-  units1 = units;
   units = scale.get_units(), 5;
   if (units < 0)
   {   
@@ -142,9 +151,15 @@ void loop()
     digitalWrite(enable, LOW);
   }
 
-  if(calibration == 1)
-  {
-    kalibracja();
+  currentMillisCali = millis();
+  if (currentMillisCali - previousMillisCali >= intervalCali) {
+    // save the last time you blinked the LED
+    previousMillisCali = currentMillisCali;
+    units1 = units;
+    if(calibration == 1)
+    {
+      kalibracja();
+    }
   }
   
 }
@@ -234,6 +249,7 @@ void stopCalibration(void)
   button = 0;
   inc = 0;
   calibration = 0;
+  pwm = 0;
   genie.WriteObject(GENIE_OBJ_LED, 0, 0);
 }
 
