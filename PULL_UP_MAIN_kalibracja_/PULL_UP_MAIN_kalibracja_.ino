@@ -32,6 +32,7 @@ int calibrationMemoryAddress = 0;
 float calibration_factor = 20.0; // this calibration factor is adjusted according to my load cell
 
 float units;
+float units1;
 float unitsMAX = 0.0;
 float MPAMAX = 0.0;
 
@@ -44,8 +45,19 @@ char * predkosc = "";
 char * powierzchnia = "";
 
 float roznica = 0.0;
-float error = 1.0;
+float roznica1 = 0.0;
+float roznica2 = 0.0;
+float error = 5.0;
 int inc = 0;
+
+//PID
+float Kr = 1.0;
+float Ti = 999999.9;
+float Td 0.0;
+
+float r0 = Kr*(1+Tp/(2*Ti)+Td/Tp);
+float r1 = Kr*(Tp/(2*Ti)-2*Td/Tp-1);
+float r2 = Kr*Td/Tp;
 
 void setup()
 {
@@ -82,6 +94,7 @@ void loop()
   
   genie.DoEvents(); // This calls the library each loop to process the queued responses from the display
 
+  units1 = units;
   units = scale.get_units(), 5;
   if (units < 0)
   {   
@@ -166,27 +179,54 @@ void fadeLed()
 
 void kalibracja()
 {
+    roznica2 = roznica1;
+    roznica1 = roznica;
     roznica = units - slider;
+    
 
-    if (abs(roznica) < error)
+    if (abs(roznica) <= error)
     {
+        inc += 1;
+    }else{
+      inc = 0;
+    }
+    if (inc >= 10000){
         stopCalibration();
     }
 
-    if(roznica < -error) /////// SILNIK GORA
-    {
+    pwm = r2*roznica2+r1*roznica1+r0*roznica+units1;  
+
+    if (pwm > 255){
+      pwm = 255;
+    }else if (pwm < -255){
+      pwm = -255;
+    }
+
+    if (pwm > 0){
       digitalWrite(down, LOW);
-      digitalWrite(up, HIGH);
-    }
-    else if(roznica > error) ///////// SILNIK DOL
-    {
-      digitalWrite(down, HIGH);
+      analogWrite(up, pwm);
+    }else if(pwm < 0){
       digitalWrite(up, LOW);
+      analogWrite(down, -pwm);
+    }else{
+      digitalWrite(up, LOW);
+      digitalWrite(down, LOW);
     }
-    else 
-    {
-      digitalWrite(enable, LOW);
-    }   
+
+//    if(roznica < -error) /////// SILNIK GORA
+//    {
+//      digitalWrite(down, LOW);
+//      digitalWrite(up, HIGH);
+//    }
+//    else if(roznica > error) ///////// SILNIK DOL
+//    {
+//      digitalWrite(down, HIGH);
+//      digitalWrite(up, LOW);
+//    }
+//    else 
+//    {
+//      digitalWrite(enable, LOW);
+//    }   
 }
 
 void stopCalibration(void)
