@@ -13,7 +13,7 @@ HX711 scale;
 
 const long interval = 15;
 unsigned long previousMillis = 0;
-unsigned long previousMillisCali = 0; 
+unsigned long previousMillisCali = 0;
 unsigned long currentMillis;
 unsigned long currentMillisCali;
 
@@ -26,13 +26,13 @@ bool calibration = 0;
 ///////////////////////////////////////////////////////    PINY
 int pwm = 0;
 int up =  11;
-int down = 10;    
+int down = 10;
 int onState = 0;
 int ledPin = 9;    // LED connected to digital pin 9
 
 int calibrationMemoryAddress = 0;
 
-float calibration_factor = 20.0; // this calibration factor is adjusted according to my load cell
+float calibration_factor = -200.0; // this calibration factor is adjusted according to my load cell
 
 float units;
 float units1;
@@ -54,11 +54,11 @@ float error = 5.0;
 int inc = 0;
 
 //PID
-float Kr = 50.0;
+float Kr = 100.0;
 float Ti = 999999.9;
 float Td = 0.0;
-float Tp = 0.001;
-const long intervalCali = 100; 
+float Tp = 0.1;
+const long intervalCali = 100;
 
 float r0;
 float r1;
@@ -81,39 +81,39 @@ void setup()
   digitalWrite(RESETLINE, 0); // unReset the Display via D4
   delay (3500); //let the display start up after the reset (This is important)
 
-  calibration_factor = EEPROM.read(calibrationMemoryAddress);
+  //  calibration_factor = EEPROM.read(calibrationMemoryAddress);
   scale.begin(DOUT, CLK);
   scale.set_scale(calibration_factor); //Adjust to this calibration factor
   scale.tare();
   genie.WriteStr(0, "PullUp Machine V.08 beta by Bad Caps");
 
-  r0 = Kr*(1+Tp/(2*Ti)+Td/Tp);
-  r1 = Kr*(Tp/(2*Ti)-2*Td/Tp-1);
-  r2 = Kr*Td/Tp;
+  r0 = Kr * (1 + Tp / (2 * Ti) + Td / Tp);
+  r1 = Kr * (Tp / (2 * Ti) - 2 * Td / Tp - 1);
+  r2 = Kr * Td / Tp;
 }
 
 
 void loop()
 {
 
-  
+
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////       STAN BATEWRII
   // read the input on analog pin 5:
   int bateria = analogRead(A5); // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V):
   float voltage = bateria * (100.0 / 1023.0); // print out the value you read:
-  
+
   genie.DoEvents(); // This calls the library each loop to process the queued responses from the display
 
   units = scale.get_units(), 5;
   if (units < 0)
-  {   
+  {
     units = 0.00;
   }                               ////////////////          GET UNITS
-  if (units > unitsMAX)         
+  if (units > unitsMAX)
   {
     unitsMAX = units;
   }
- 
+
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
   MPA = units / mm2;
   MPAMAX = unitsMAX / mm2;
@@ -128,7 +128,7 @@ void loop()
   onState = digitalRead(on);
 
   // check if the switch is pressed.
-  if (onState == LOW) 
+  if (onState == LOW)
   {
     // turn motor on:
     digitalWrite(down, LOW);
@@ -156,12 +156,12 @@ void loop()
     // save the last time you blinked the LED
     previousMillisCali = currentMillisCali;
     units1 = units;
-    if(calibration == 1)
+    if (calibration == 1)
     {
       kalibracja();
     }
   }
-  
+
 }
 
 void fadeLed()
@@ -187,61 +187,63 @@ void fadeLed()
     {
       fadeUp = 1;
     }
-    
+
     analogWrite(ledPin, fadeValue);
   }
 }
 
 void kalibracja()
 {
-    roznica2 = roznica1;
-    roznica1 = roznica;
-    roznica = units - slider;
-    
+  roznica2 = roznica1;
+  roznica1 = roznica;
+  roznica = slider - units;
 
-    if (abs(roznica) <= error)
-    {
-        inc += 1;
-    }else{
-      inc = 0;
-    }
-    if (inc >= 10000){
-        stopCalibration();
-    }
+  Serial.println(units);
 
-    pwm = r2*roznica2+r1*roznica1+r0*roznica+units1;  
 
-    if (pwm > 255){
-      pwm = 255;
-    }else if (pwm < -255){
-      pwm = -255;
-    }
+  if (abs(roznica) <= error)
+  {
+    inc += 1;
+  } else {
+    inc = 0;
+  }
+  if (inc >= 10000) {
+    stopCalibration();
+  }
 
-    if (pwm > 0){
-      digitalWrite(down, LOW);
-      analogWrite(up, pwm);
-    }else if(pwm < 0){
-      digitalWrite(up, LOW);
-      analogWrite(down, -pwm);
-    }else{
-      digitalWrite(up, LOW);
-      digitalWrite(down, LOW);
-    }
+  pwm = r2 * roznica2 + r1 * roznica1 + r0 * roznica + units1;
 
-//    if(roznica < -error) /////// SILNIK GORA
-//    {
-//      digitalWrite(down, LOW);
-//      digitalWrite(up, HIGH);
-//    }
-//    else if(roznica > error) ///////// SILNIK DOL
-//    {
-//      digitalWrite(down, HIGH);
-//      digitalWrite(up, LOW);
-//    }
-//    else 
-//    {
-//      digitalWrite(enable, LOW);
-//    }   
+  if (pwm > 255) {
+    pwm = 255;
+  } else if (pwm < -255) {
+    pwm = -255;
+  }
+
+  if (pwm > 0) {
+    digitalWrite(down, LOW);
+    analogWrite(up, pwm);
+  } else if (pwm < 0) {
+    digitalWrite(up, LOW);
+    analogWrite(down, -pwm);
+  } else {
+    digitalWrite(up, LOW);
+    digitalWrite(down, LOW);
+  }
+
+  //    if(roznica < -error) /////// SILNIK GORA
+  //    {
+  //      digitalWrite(down, LOW);
+  //      digitalWrite(up, HIGH);
+  //    }
+  //    else if(roznica > error) ///////// SILNIK DOL
+  //    {
+  //      digitalWrite(down, HIGH);
+  //      digitalWrite(up, LOW);
+  //    }
+  //    else
+  //    {
+  //      digitalWrite(enable, LOW);
+  //    }
 }
 
 void stopCalibration(void)
@@ -297,43 +299,43 @@ void myGenieEventHandler(void)
       }
       else if (Event.reportObject.index == 2)///////////////////////////////////// POMIAR
       {
-         genie.WriteStr(2, "100");
-         genie.WriteStr(4, powierzchnia);
+        genie.WriteStr(2, "100");
+        genie.WriteStr(4, powierzchnia);
       }
       else if (Event.reportObject.index == 18)///////////////////////////////////// ZAPISANIE KALIBRACJI
       {
-         EEPROM.update(calibrationMemoryAddress, calibration_factor);
+        EEPROM.update(calibrationMemoryAddress, calibration_factor);
       }
       else if (Event.reportObject.index == 17)///////////////////////////////////// KALIBRACJA STOP
       {
-         stopCalibration();
+        stopCalibration();
       }
       else if (Event.reportObject.index == 15)///////////////////////////////////// WZROST CALIBRATION_FACTOR
       {
-         calibration_factor += 1;
-         scale.set_scale(calibration_factor); //Adjust to this calibration factor
+        calibration_factor += 1;
+        scale.set_scale(calibration_factor); //Adjust to this calibration factor
       }
       else if (Event.reportObject.index == 16)///////////////////////////////////// SPADEK CALIBRATION_FACTOR
       {
-         calibration_factor -= 1;
-         scale.set_scale(calibration_factor); //Adjust to this calibration factor
+        calibration_factor -= 1;
+        scale.set_scale(calibration_factor); //Adjust to this calibration factor
       }
 
     }
 
-   if (Event.reportObject.object == GENIE_OBJ_FORM)
-   {
+    if (Event.reportObject.object == GENIE_OBJ_FORM)
+    {
       if (Event.reportObject.index == 2)
       {
-         genie.WriteStr(2, predkosc);
-         genie.WriteStr(4, powierzchnia);
-         newMeasure();
+        genie.WriteStr(2, predkosc);
+        genie.WriteStr(4, powierzchnia);
+        newMeasure();
       }
       if (Event.reportObject.index == 0)
       {
-         stopCalibration();
+        stopCalibration();
       }
-   }
+    }
 
     if (Event.reportObject.object == GENIE_OBJ_TRACKBAR)
     {
